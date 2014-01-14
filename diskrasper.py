@@ -133,7 +133,7 @@ class UserInterface(threading.Thread):
         GPIO.output(gpiopins['B'], True)
         time.sleep(0.5)
         GPIO.output(gpiopins['buzzer'], False)
-        GPIO.output(gpiopins['B'], True)
+        GPIO.output(gpiopins['B'], False)
 
     def run(self):
         while not self.stopevent.is_set():
