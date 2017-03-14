@@ -2,64 +2,64 @@
 # -*- coding: utf-8 -*-
 
 """
-	Overall design
-	==============
+Overall design
+==============
 
-	A state machine running in the main thread, and some helper
-	threads monitoring disk insertion/removal and disk I/O.
-
-
-	State machine
-	=============
-
-	States		Description			LEDs
-	-------------	-----------------------------	------------
-	IDLE 		No disk present			dark
-	READY 		Disk inserted			yellow
-	ERASING 	dd running			yellow blink
-	IOERROR 	dd failed, disk present		red
-	WIPED 		dd succeeded, disk present	green
-	YANKED 		Disk removed while erasing	red
-	-------------	-----------------------------	------------
-	
-	Inputs/Events	Description
-	-------------	--------------------------------------------
-	add		A disk is inserted
-	remove		A disk is removed
-	button		The button is pressed
-	dd_ok		dd finishes with exit code 0
-	dd_fail		dd finishes with error
-	-------------	--------------------------------------------
-
-	State transition table
-	----------------------
-
-	CURRENT STATE → .-----------------------------------------------------------.
-	        INPUT ↓ |  IDLE   |  READY  | ERASING | IOERROR |  WIPED  | YANKED  |
-	.---------------|---------|---------|---------|---------|---------|---------|
-	| add           |  READY  |         |         |         |         |  READY  |
-	|---------------|---------|---------|---------|---------|---------|---------|
-	| remove        |         |  IDLE   | YANKED  |  IDLE   |  IDLE   |         |
-	|---------------|---------|---------|---------|---------|---------|---------|
-	| button        |    -    | ERASING |    -    |    -    |    -    |  IDLE   |
-	|---------------|---------|---------|---------|---------|---------|---------|
-	| dd_ok         |         |         |  WIPED  |         |         |         |
-	|---------------|---------|---------|---------|---------|---------|---------|
-	| dd_fail       |         |         | IOERROR |         |         |         |
-	.---------------.---------.---------.---------.---------.---------.---------.
-
-		[-]: Input is ignored (no transition)
-		[ ]: Invalid transition (should never happen, ignore/log as error)
+A state machine running in the main thread, and some helper
+threads monitoring disk insertion/removal and disk I/O.
 
 
-	Helper threads
-	==============
+State machine
+=============
 
-	UserInterface:	Thread controlling the LEDs (necessary because of blinking)
-	DiskMonitor:	Thread listening for udev events (disk insertion/removal)
-	DiskWiper:	Thread responsible for running/monitoring the 'dd' process
+States          Description                     LEDs
+-------------   -----------------------------   ------------
+IDLE            No disk present                 dark
+READY           Disk inserted                   yellow
+ERASING         dd running                      yellow blink
+IOERROR         dd failed, disk present         red
+WIPED           dd succeeded, disk present      green
+YANKED          Disk removed while erasing      red
+-------------   -----------------------------   ------------
 
-	The helper threads sends events to the state machine through a Queue()
+Inputs/Events   Description
+-------------   --------------------------------------------
+add             A disk is inserted
+remove          A disk is removed
+button          The button is pressed
+dd_ok           dd finishes with exit code 0
+dd_fail         dd finishes with error
+-------------   --------------------------------------------
+
+State transition table
+----------------------
+
+CURRENT STATE → .-----------------------------------------------------------.
+        INPUT ↓ |  IDLE   |  READY  | ERASING | IOERROR |  WIPED  | YANKED  |
+.---------------|---------|---------|---------|---------|---------|---------|
+| add           |  READY  |         |         |         |         |  READY  |
+|---------------|---------|---------|---------|---------|---------|---------|
+| remove        |         |  IDLE   | YANKED  |  IDLE   |  IDLE   |         |
+|---------------|---------|---------|---------|---------|---------|---------|
+| button        |    -    | ERASING |    -    |    -    |    -    |  IDLE   |
+|---------------|---------|---------|---------|---------|---------|---------|
+| dd_ok         |         |         |  WIPED  |         |         |         |
+|---------------|---------|---------|---------|---------|---------|---------|
+| dd_fail       |         |         | IOERROR |         |         |         |
+.---------------.---------.---------.---------.---------.---------.---------.
+
+        [-]: Input is ignored (no transition)
+        [ ]: Invalid transition (should never happen, ignore/log as error)
+
+
+Helper threads
+==============
+
+UserInterface:  Thread controlling the LEDs (necessary because of blinking)
+DiskMonitor:    Thread listening for udev events (disk insertion/removal)
+DiskWiper:      Thread responsible for running/monitoring the 'dd' process
+
+The helper threads sends events to the state machine through a Queue()
 
 
 """
@@ -75,7 +75,7 @@ import RPi.GPIO as GPIO
 
 # GPIO pins for the red/green/blue LEDS, the buzzer, and the button.
 gpiomode = GPIO.BCM
-gpiopins = {"R":10, "G":9, "B":11, "buzzer":8}
+gpiopins = {"R": 10, "G": 9, "B": 11, "buzzer": 8}
 gpiobutton = 7
 
 # Name of the device we're watching for (and wiping).
@@ -83,11 +83,11 @@ wipedevice = 'sda'
 
 # Command used to wipe the device.
 wipecmd = ['python' 'dd.py', '/dev/'+wipedevice]
-#wipecmd = ['bash', '-c', 'sleep 20; exit $[RANDOM%4]']
-
+# wipecmd = ['bash', '-c', 'sleep 20; exit $[RANDOM%4]']
 
 
 lock = threading.Lock()
+
 
 def info(msg):
     global lock
@@ -95,12 +95,12 @@ def info(msg):
     print >>sys.stderr, msg
     lock.release()
 
+
 def debug(msg):
     global lock
     lock.acquire()
     print >>sys.stderr, "<%s>: %s" % (threading.current_thread().name, msg)
     lock.release()
-
 
 
 class UserInterface(threading.Thread):
@@ -119,9 +119,9 @@ class UserInterface(threading.Thread):
             "green":  [("G",  None)],
             "blue":   [("B",  None)],
             "blank":  [("",   None)],
-            #"blink":  [("RG", 0.1), ("B", 0.1), ("", 0.1)], # Alternate yellow/blue
-            #"blink":  [("RG", 0.5), ("", 0.5)] # 1 Hz yellow blinking, 50% duty cycle
-            "blink":  [("RG", 0.03), ("", 0.08)] * 4 + [("", 0.11*5)], # Rythmic
+            # "blink":  [("RG", 0.1), ("B", 0.1), ("", 0.1)],  # Alternate yellow/blue
+            # "blink":  [("RG", 0.5), ("", 0.5)]  # 1 Hz yellow blinking, 50% duty cycle
+            "blink":  [("RG", 0.03), ("", 0.08)] * 4 + [("", 0.11*5)],  # Rythmic
         }
         self.pattern = self.patterns['blank']
         # Initialize GPIO pins
@@ -156,7 +156,6 @@ class UserInterface(threading.Thread):
         if p in self.patterns:
             self.pattern = self.patterns[p]
             self.update.set()
-
 
 
 class DiskMonitor(threading.Thread):
@@ -195,7 +194,6 @@ class DiskMonitor(threading.Thread):
         self.statemachine.event('remove')
 
 
-
 class DiskWiper(threading.Thread):
     """ Helper thread for wiping the disk.
         Use the wipe() method to start wiping.
@@ -212,7 +210,7 @@ class DiskWiper(threading.Thread):
         """ Stop the wiping process, for example when the disk is yanked. """
         debug("Killing 'dd'!")
         try:
-            self.proc.kill() 
+            self.proc.kill()
         except OSError:
             pass
 
@@ -231,11 +229,10 @@ class DiskWiper(threading.Thread):
             if ret == 0:
                 self.statemachine.event('dd_ok')
             else:
-		# We may fail because disk has been yanked and current state is YANKED.
-		# If this is the case, don't send an event that dd failed - we know it.
+                # We may fail because disk has been yanked and current state is YANKED.
+                # If this is the case, don't send an event that dd failed - we know it.
                 if self.statemachine.state != 'YANKED':
                     self.statemachine.event('dd_fail')
-
 
 
 class StateMachine(object):
@@ -270,9 +267,9 @@ class StateMachine(object):
 
     def run(self):
         """ Process incoming events. """
-	self.diskmonitor.start()
-	self.diskwiper.start()
-	self.userinterface.start()
+        self.diskmonitor.start()
+        self.diskwiper.start()
+        self.userinterface.start()
         self.enter(self.initial)
         GPIO.setup(gpiobutton, GPIO.IN)
         GPIO.add_event_detect(gpiobutton, GPIO.RISING, callback=self._button, bouncetime=200)
@@ -316,7 +313,6 @@ class StateMachine(object):
     def enter_YANKED(self):
         self.diskwiper.abort()
         self.userinterface.display("red")
-
 
 
 transitions = [
