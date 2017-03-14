@@ -121,7 +121,7 @@ class UserInterface(threading.Thread):
             "blank":  [("",   None)],
             # "blink":  [("RG", 0.1), ("B", 0.1), ("", 0.1)],  # Alternate yellow/blue
             # "blink":  [("RG", 0.5), ("", 0.5)]  # 1 Hz yellow blinking, 50% duty cycle
-            "blink":  [("RG", 0.03), ("", 0.08)] * 4 + [("", 0.11*5)],  # Rythmic
+            "blink":  [("RG", 0.03), ("", 0.08)] * 4 + [("", 0.11*5)],  # Rhythmic
         }
         self.pattern = self.patterns['blank']
         # Initialize GPIO pins
@@ -152,7 +152,7 @@ class UserInterface(threading.Thread):
         self.stopevent.set()
 
     def display(self, p):
-        """ Displays the pattern namd p (as defined in self.patterns) on the LED. """
+        """ Displays the pattern named p (as defined in self.patterns) on the LED. """
         if p in self.patterns:
             self.pattern = self.patterns[p]
             self.update.set()
