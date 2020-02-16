@@ -51,7 +51,6 @@ The behaviour is controlled by a
 and a `dd` helper script which performs the erasing.
 The state machine has the following properties:
 
-    :::text
     States          Description                     LEDs
     -------------   -----------------------------   ------------
     IDLE            No disk present                 dark
