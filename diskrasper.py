@@ -248,7 +248,7 @@ class DiskWiper(threading.Thread):
                     self.statemachine.event('dd_fail')
 
 
-class StateMachine(object):
+class StateMachine():
     """The state machine keeping track of everything."""
     def __init__(self, transitions, initial):
         """Initialize thread."""
