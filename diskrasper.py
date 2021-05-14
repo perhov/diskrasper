@@ -91,7 +91,7 @@ LOCK = threading.Lock()
 
 
 def info(msg):
-    """ Write an informational message to stderr. """
+    """Write an informational message to stderr."""
     global LOCK
     LOCK.acquire()
     print(msg, file=sys.stderr)
@@ -99,7 +99,7 @@ def info(msg):
 
 
 def debug(msg):
-    """ Write a debug message to stderr. """
+    """Write a debug message to stderr."""
     global LOCK
     LOCK.acquire()
     print("<%s>: %s" % (threading.current_thread().name, msg), file=sys.stderr)
@@ -107,11 +107,12 @@ def debug(msg):
 
 
 class UserInterface(threading.Thread):
-    """ Helper thread controlling the LEDs.
-        To set the LEDs, use the display() method.
+    """
+    Helper thread controlling the LEDs.
+    To set the LEDs, use the display() method.
     """
     def __init__(self):
-        """ Initialize thread. """
+        """Initialize thread."""
         threading.Thread.__init__(self)
         self.name = "UIThread"
         self.stopevent = threading.Event()
@@ -140,7 +141,7 @@ class UserInterface(threading.Thread):
         GPIO.output(GPIOPINS['B'], False)
 
     def run(self):
-        """ Method containing thread's code. """
+        """Method containing thread's code."""
         while not self.stopevent.is_set():
             for leds, duration in self.pattern:
                 # Turn on the LEDs in 'leds' and turn off all others.
@@ -153,20 +154,20 @@ class UserInterface(threading.Thread):
         debug("Stop event received")
 
     def stop(self):
-        """ Method used to terminate the thread. """
+        """Method used to terminate the thread."""
         self.stopevent.set()
 
     def display(self, pat):
-        """ Displays the pattern named pat (as defined in self.patterns) on the LED. """
+        """Displays the pattern named pat (as defined in self.patterns) on the LED."""
         if pat in self.patterns:
             self.pattern = self.patterns[pat]
             self.update.set()
 
 
 class DiskMonitor(threading.Thread):
-    """ Helper thread monitoring disk insertion/removal. """
+    """Helper thread monitoring disk insertion/removal."""
     def __init__(self, statemachine):
-        """ Initialize thread. """
+        """Initialize thread."""
         threading.Thread.__init__(self)
         self.daemon = True
         self.name = "DiskMonitorThread"
@@ -176,7 +177,7 @@ class DiskMonitor(threading.Thread):
         self.monitor.filter_by(subsystem='block', device_type='disk')
 
     def run(self):
-        """ Method containing thread's code. """
+        """Method containing thread's code."""
         try:
             # Check if a disk is already present at startup
             device = pyudev.Device.from_name(self.context, 'block', WIPEDEVICE)
@@ -192,23 +193,24 @@ class DiskMonitor(threading.Thread):
                     self._remove(device)
 
     def _add(self, device):
-        """ Method called on device insertion. """
+        """Method called on device insertion."""
         model = device.get('ID_MODEL', '?')
         serial = device.get('ID_SERIAL_SHORT', '?')
         debug("Disk added: <%s> serial=%s" % (model, serial))
         self.statemachine.event('add')
 
     def _remove(self, device):  # pylint: disable=unused-argument
-        """ Method called on device removal. """
+        """Method called on device removal."""
         self.statemachine.event('remove')
 
 
 class DiskWiper(threading.Thread):
-    """ Helper thread for wiping the disk.
-        Use the wipe() method to start wiping.
+    """
+    Helper thread for wiping the disk.
+    Use the wipe() method to start wiping.
     """
     def __init__(self, statemachine):
-        """ Initialize thread. """
+        """Initialize thread."""
         threading.Thread.__init__(self)
         self.daemon = True
         self.name = "DiskWiperThread"
@@ -217,7 +219,7 @@ class DiskWiper(threading.Thread):
         self.wipeevent = threading.Event()
 
     def abort(self):
-        """ Stop the wiping process, for example when the disk is yanked. """
+        """Stop the wiping process, for example when the disk is yanked."""
         debug("Killing 'dd'!")
         try:
             self.proc.kill()
@@ -225,11 +227,11 @@ class DiskWiper(threading.Thread):
             pass
 
     def wipe(self):
-        """ Start wiping the disk. """
+        """Start wiping the disk."""
         self.wipeevent.set()
 
     def run(self):
-        """ Method containing thread's code. """
+        """Method containing thread's code."""
         while True:
             self.wipeevent.wait()
             debug("Starting '%s'" % " ".join(WIPECMD))
@@ -247,9 +249,9 @@ class DiskWiper(threading.Thread):
 
 
 class StateMachine(object):
-    """ The state machine keeping track of everything. """
+    """The state machine keeping track of everything."""
     def __init__(self, transitions, initial):
-        """ Initialize thread. """
+        """Initialize thread."""
         GPIO.setmode(GPIOMODE)
         self.queue = queue.Queue()
         self.diskmonitor = DiskMonitor(self)
@@ -260,7 +262,7 @@ class StateMachine(object):
         self.state = None
 
     def stop(self):
-        """ Halt the state machine. """
+        """Halt the state machine."""
         debug("FSM Stopping")
         self.userinterface.stop()
         self.userinterface.join()
@@ -268,7 +270,7 @@ class StateMachine(object):
         debug("FSM Stopped")
 
     def enter(self, newstate):
-        """ Perform a transition to 'newstate'. """
+        """Perform a transition to 'newstate'."""
         info("STATE: %s => %s" % (self.state, newstate))
         if self.state != newstate:
             if hasattr(self, 'leave_%s' % self.state):
@@ -278,7 +280,7 @@ class StateMachine(object):
                 getattr(self, 'enter_%s' % self.state)()
 
     def run(self):
-        """ Process incoming events. """
+        """Process incoming events."""
         self.diskmonitor.start()
         self.diskwiper.start()
         self.userinterface.start()
@@ -299,36 +301,36 @@ class StateMachine(object):
                 info("ERROR: Event is invalid in state '%s'" % self.state)
 
     def _button(self, _channel):
-        """ Called when the button is pressed. """
+        """Called when the button is pressed."""
         self.event('button')
 
     def event(self, evt):
-        """ Used by other threads to queue events to the state machine. """
+        """Used by other threads to queue events to the state machine."""
         self.queue.put(evt)
 
     def enter_IDLE(self):  # pylint: disable=invalid-name
-        """ Called upon entering IDLE state. """
+        """Called upon entering IDLE state."""
         self.userinterface.display("blank")
 
     def enter_READY(self):  # pylint: disable=invalid-name
-        """ Called upon entering READY state. """
+        """Called upon entering READY state."""
         self.userinterface.display("yellow")
 
     def enter_ERASING(self):  # pylint: disable=invalid-name
-        """ Called upon entering ERASING state. """
+        """Called upon entering ERASING state."""
         self.diskwiper.wipe()
         self.userinterface.display("blink")
 
     def enter_IOERROR(self):  # pylint: disable=invalid-name
-        """ Called upon entering IOERROR state. """
+        """Called upon entering IOERROR state."""
         self.userinterface.display("red")
 
     def enter_WIPED(self):  # pylint: disable=invalid-name
-        """ Called upon entering WIPED state. """
+        """Called upon entering WIPED state."""
         self.userinterface.display("green")
 
     def enter_YANKED(self):  # pylint: disable=invalid-name
-        """ Called upon entering YANKED state. """
+        """Called upon entering YANKED state."""
         self.diskwiper.abort()
         self.userinterface.display("red")
 
@@ -354,7 +356,7 @@ TRANSITIONS = [
 
 
 def main():
-    """ Main entry point. """
+    """Main entry point."""
     fsm = StateMachine(transitions=TRANSITIONS, initial='IDLE')
     try:
         fsm.run()
