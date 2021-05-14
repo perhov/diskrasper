@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 """
 Helper script to erase device.
 """
@@ -21,21 +20,21 @@ def main():
         fdesc = os.open(device, os.O_RDWR)
         size = os.lseek(fdesc, 0, os.SEEK_END)
         offz = os.lseek(fdesc, 0, os.SEEK_SET)
-        print >>sys.stderr, "dd: Writing {size} bytes to '{device}'".format(**locals())
+        print("dd: Writing {size} bytes to '{device}'".format(**locals()), file=sys.stderr)
         t_0 = time.time()
         while offz < size:
             offz += os.write(fdesc, ZEROS)
         t_1 = time.time()
     except:  # pylint: disable=bare-except
         traceback.print_exc()
-        print >>sys.stderr, "dd: FAILED"
+        print("dd: FAILED", file=sys.stderr)
         sys.exit(1)
 
     try:
         speed = size/2**20/(t_1-t_0)
     except:  # pylint: disable=bare-except
         speed = "Inf"
-    print >>sys.stderr, "dd: OK (%.1f MB/s)" % speed
+    print("dd: OK (%.1f MB/s)" % speed, file=sys.stderr)
     sys.exit(0)
 
 

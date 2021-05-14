@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
 """
 Overall design
@@ -70,7 +69,7 @@ import sys
 import threading
 import time
 import traceback
-import Queue
+import queue
 
 import pyudev
 import RPi.GPIO as GPIO
@@ -95,7 +94,7 @@ def info(msg):
     """ Write an informational message to stderr. """
     global LOCK
     LOCK.acquire()
-    print >>sys.stderr, msg
+    print(msg, file=sys.stderr)
     LOCK.release()
 
 
@@ -103,7 +102,7 @@ def debug(msg):
     """ Write a debug message to stderr. """
     global LOCK
     LOCK.acquire()
-    print >>sys.stderr, "<%s>: %s" % (threading.current_thread().name, msg)
+    print("<%s>: %s" % (threading.current_thread().name, msg), file=sys.stderr)
     LOCK.release()
 
 
@@ -252,7 +251,7 @@ class StateMachine(object):
     def __init__(self, transitions, initial):
         """ Initialize thread. """
         GPIO.setmode(GPIOMODE)
-        self.queue = Queue.Queue()
+        self.queue = queue.Queue()
         self.diskmonitor = DiskMonitor(self)
         self.diskwiper = DiskWiper(self)
         self.userinterface = UserInterface()
@@ -289,7 +288,7 @@ class StateMachine(object):
         while True:
             try:
                 event = self.queue.get(timeout=10)
-            except Queue.Empty:
+            except queue.Empty:
                 continue
             info("EVENT: %s" % event)
             for curstate, trigger, newstate in self.transitions:
