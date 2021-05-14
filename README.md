@@ -97,5 +97,5 @@ The state machine has the following properties:
   * Step 1: Connect the SATA docking station to the Pi with a USB cable.
   * Step 2: Connect the Big Red Button and the safety switch in series,
     and connect the button and LEDS to the GPIO breakout board. The pinout
-    is documented in the [source](https://bitbucket.org/perhov/diskrasper/src).
+    is documented in the [source](https://github.com/perhov/diskrasper/blob/master/diskrasper.py).
   * Step 3: Build a cabinet.
