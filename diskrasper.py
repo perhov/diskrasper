@@ -64,43 +64,47 @@ The helper threads sends events to the state machine through a Queue()
 
 """
 
-import pyudev
+
 import subprocess
 import sys
 import threading
 import time
 import traceback
 import Queue
+
+import pyudev
 import RPi.GPIO as GPIO
 
 # GPIO pins for the red/green/blue LEDS, the buzzer, and the button.
-gpiomode = GPIO.BCM
-gpiopins = {"R": 10, "G": 9, "B": 11, "buzzer": 8}
-gpiobutton = 7
+GPIOMODE = GPIO.BCM
+GPIOPINS = {"R": 10, "G": 9, "B": 11, "buzzer": 8}
+GPIOBUTTON = 7
 
 # Name of the device we're watching for (and wiping).
-wipedevice = 'sda'
+WIPEDEVICE = 'sda'
 
 # Command used to wipe the device.
-wipecmd = ['python' 'dd.py', '/dev/'+wipedevice]
-# wipecmd = ['bash', '-c', 'sleep 20; exit $[RANDOM%4]']
+WIPECMD = ['python' 'dd.py', '/dev/'+WIPEDEVICE]
+# WIPECMD = ['bash', '-c', 'sleep 20; exit $[RANDOM%4]']
 
 
-lock = threading.Lock()
+LOCK = threading.Lock()
 
 
 def info(msg):
-    global lock
-    lock.acquire()
+    """ Write an informational message to stderr. """
+    global LOCK
+    LOCK.acquire()
     print >>sys.stderr, msg
-    lock.release()
+    LOCK.release()
 
 
 def debug(msg):
-    global lock
-    lock.acquire()
+    """ Write a debug message to stderr. """
+    global LOCK
+    LOCK.acquire()
     print >>sys.stderr, "<%s>: %s" % (threading.current_thread().name, msg)
-    lock.release()
+    LOCK.release()
 
 
 class UserInterface(threading.Thread):
@@ -108,39 +112,41 @@ class UserInterface(threading.Thread):
         To set the LEDs, use the display() method.
     """
     def __init__(self):
+        """ Initialize thread. """
         threading.Thread.__init__(self)
         self.name = "UIThread"
         self.stopevent = threading.Event()
         self.update = threading.Event()
         self.patterns = {
             # [(led, duration), (led, duration), ...] and duration=None means forever
-            "red":    [("R",  None)],
+            "red":    [("R", None)],
             "yellow": [("RG", None)],
-            "green":  [("G",  None)],
-            "blue":   [("B",  None)],
-            "blank":  [("",   None)],
+            "green":  [("G", None)],
+            "blue":   [("B", None)],
+            "blank":  [("", None)],
             # "blink":  [("RG", 0.1), ("B", 0.1), ("", 0.1)],  # Alternate yellow/blue
             # "blink":  [("RG", 0.5), ("", 0.5)]  # 1 Hz yellow blinking, 50% duty cycle
             "blink":  [("RG", 0.03), ("", 0.08)] * 4 + [("", 0.11*5)],  # Rhythmic
         }
         self.pattern = self.patterns['blank']
         # Initialize GPIO pins
-        for x in gpiopins.values():
-            GPIO.setup(x, GPIO.OUT)
-            GPIO.output(x, False)
+        for pin in GPIOPINS.values():
+            GPIO.setup(pin, GPIO.OUT)
+            GPIO.output(pin, False)
         # Confirm that we're up and running by beeping and blinking blue once
-        GPIO.output(gpiopins['buzzer'], True)
-        GPIO.output(gpiopins['B'], True)
+        GPIO.output(GPIOPINS['buzzer'], True)
+        GPIO.output(GPIOPINS['B'], True)
         time.sleep(0.5)
-        GPIO.output(gpiopins['buzzer'], False)
-        GPIO.output(gpiopins['B'], False)
+        GPIO.output(GPIOPINS['buzzer'], False)
+        GPIO.output(GPIOPINS['B'], False)
 
     def run(self):
+        """ Method containing thread's code. """
         while not self.stopevent.is_set():
             for leds, duration in self.pattern:
                 # Turn on the LEDs in 'leds' and turn off all others.
-                for x in "RGB":
-                    GPIO.output(gpiopins[x], x in leds)
+                for color in "RGB":
+                    GPIO.output(GPIOPINS[color], color in leds)
                 # Sleep for the given duration, unless the pattern has changed.
                 if self.update.wait(timeout=duration):
                     self.update.clear()
@@ -151,16 +157,17 @@ class UserInterface(threading.Thread):
         """ Method used to terminate the thread. """
         self.stopevent.set()
 
-    def display(self, p):
-        """ Displays the pattern named p (as defined in self.patterns) on the LED. """
-        if p in self.patterns:
-            self.pattern = self.patterns[p]
+    def display(self, pat):
+        """ Displays the pattern named pat (as defined in self.patterns) on the LED. """
+        if pat in self.patterns:
+            self.pattern = self.patterns[pat]
             self.update.set()
 
 
 class DiskMonitor(threading.Thread):
     """ Helper thread monitoring disk insertion/removal. """
     def __init__(self, statemachine):
+        """ Initialize thread. """
         threading.Thread.__init__(self)
         self.daemon = True
         self.name = "DiskMonitorThread"
@@ -170,27 +177,30 @@ class DiskMonitor(threading.Thread):
         self.monitor.filter_by(subsystem='block', device_type='disk')
 
     def run(self):
+        """ Method containing thread's code. """
         try:
             # Check if a disk is already present at startup
-            device = pyudev.Device.from_name(self.context, 'block', wipedevice)
+            device = pyudev.Device.from_name(self.context, 'block', WIPEDEVICE)
             self._add(device)
         except pyudev.device.DeviceNotFoundByNameError:
             pass
         # Monitor for udev events
         for action, device in self.monitor:
-            if device['DEVNAME'] == '/dev/' + wipedevice:
+            if device['DEVNAME'] == '/dev/' + WIPEDEVICE:
                 if action == 'add':
                     self._add(device)
                 elif action == 'remove':
                     self._remove(device)
 
     def _add(self, device):
+        """ Method called on device insertion. """
         model = device.get('ID_MODEL', '?')
         serial = device.get('ID_SERIAL_SHORT', '?')
         debug("Disk added: <%s> serial=%s" % (model, serial))
         self.statemachine.event('add')
 
-    def _remove(self, device):
+    def _remove(self, device):  # pylint: disable=unused-argument
+        """ Method called on device removal. """
         self.statemachine.event('remove')
 
 
@@ -199,6 +209,7 @@ class DiskWiper(threading.Thread):
         Use the wipe() method to start wiping.
     """
     def __init__(self, statemachine):
+        """ Initialize thread. """
         threading.Thread.__init__(self)
         self.daemon = True
         self.name = "DiskWiperThread"
@@ -219,11 +230,12 @@ class DiskWiper(threading.Thread):
         self.wipeevent.set()
 
     def run(self):
+        """ Method containing thread's code. """
         while True:
             self.wipeevent.wait()
-            debug("Starting '%s'" % " ".join(wipecmd))
+            debug("Starting '%s'" % " ".join(WIPECMD))
             self.wipeevent.clear()
-            self.proc = subprocess.Popen(wipecmd)
+            self.proc = subprocess.Popen(WIPECMD)
             ret = self.proc.wait()
             debug("exit code %d" % ret)
             if ret == 0:
@@ -238,7 +250,8 @@ class DiskWiper(threading.Thread):
 class StateMachine(object):
     """ The state machine keeping track of everything. """
     def __init__(self, transitions, initial):
-        GPIO.setmode(gpiomode)
+        """ Initialize thread. """
+        GPIO.setmode(GPIOMODE)
         self.queue = Queue.Queue()
         self.diskmonitor = DiskMonitor(self)
         self.diskwiper = DiskWiper(self)
@@ -271,51 +284,58 @@ class StateMachine(object):
         self.diskwiper.start()
         self.userinterface.start()
         self.enter(self.initial)
-        GPIO.setup(gpiobutton, GPIO.IN)
-        GPIO.add_event_detect(gpiobutton, GPIO.RISING, callback=self._button, bouncetime=200)
+        GPIO.setup(GPIOBUTTON, GPIO.IN)
+        GPIO.add_event_detect(GPIOBUTTON, GPIO.RISING, callback=self._button, bouncetime=200)
         while True:
             try:
                 event = self.queue.get(timeout=10)
             except Queue.Empty:
                 continue
             info("EVENT: %s" % event)
-            for curstate, ev, newstate in self.transitions:
-                if curstate == self.state and event == ev:
+            for curstate, trigger, newstate in self.transitions:
+                if curstate == self.state and event == trigger:
                     self.enter(newstate)
                     break
             else:
                 info("ERROR: Event is invalid in state '%s'" % self.state)
 
-    def _button(self, channel):
+    def _button(self, _channel):
         """ Called when the button is pressed. """
         self.event('button')
 
-    def event(self, e):
+    def event(self, evt):
         """ Used by other threads to queue events to the state machine. """
-        self.queue.put(e)
+        self.queue.put(evt)
 
-    def enter_IDLE(self):
+    def enter_IDLE(self):  # pylint: disable=invalid-name
+        """ Called upon entering IDLE state. """
         self.userinterface.display("blank")
 
-    def enter_READY(self):
+    def enter_READY(self):  # pylint: disable=invalid-name
+        """ Called upon entering READY state. """
         self.userinterface.display("yellow")
 
-    def enter_ERASING(self):
+    def enter_ERASING(self):  # pylint: disable=invalid-name
+        """ Called upon entering ERASING state. """
         self.diskwiper.wipe()
         self.userinterface.display("blink")
 
-    def enter_IOERROR(self):
+    def enter_IOERROR(self):  # pylint: disable=invalid-name
+        """ Called upon entering IOERROR state. """
         self.userinterface.display("red")
 
-    def enter_WIPED(self):
+    def enter_WIPED(self):  # pylint: disable=invalid-name
+        """ Called upon entering WIPED state. """
         self.userinterface.display("green")
 
-    def enter_YANKED(self):
+    def enter_YANKED(self):  # pylint: disable=invalid-name
+        """ Called upon entering YANKED state. """
         self.diskwiper.abort()
         self.userinterface.display("red")
 
 
-transitions = [
+# pylint: disable=bad-whitespace
+TRANSITIONS = [
     ('IDLE',    'add',     'READY'),
     ('IDLE',    'button',  'IDLE'),
     ('READY',   'remove',  'IDLE'),
@@ -331,15 +351,23 @@ transitions = [
     ('YANKED',  'add',     'READY'),
     ('YANKED',  'button',  'IDLE')
 ]
+# pylint: enable=bad-whitespace
 
-fsm = StateMachine(transitions=transitions, initial='IDLE')
-try:
-    fsm.run()
-    debug("FSM Really stopped")
-except KeyboardInterrupt:
-    debug("Caught KeyboardInterrupt")
-    fsm.stop()
-except Exception as e:
-    debug("Caught Exception")
-    traceback.print_exc()
-    fsm.stop()
+
+def main():
+    """ Main entry point. """
+    fsm = StateMachine(transitions=TRANSITIONS, initial='IDLE')
+    try:
+        fsm.run()
+        debug("FSM Really stopped")
+    except KeyboardInterrupt:
+        debug("Caught KeyboardInterrupt")
+        fsm.stop()
+    except Exception:  # pylint: disable=broad-except
+        debug("Caught Exception")
+        traceback.print_exc()
+        fsm.stop()
+
+
+if __name__ == '__main__':
+    main()
