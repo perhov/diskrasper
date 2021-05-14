@@ -83,7 +83,7 @@ GPIOBUTTON = 7
 WIPEDEVICE = 'sda'
 
 # Command used to wipe the device.
-WIPECMD = ['python' 'dd.py', '/dev/'+WIPEDEVICE]
+WIPECMD = ['python', 'dd.py', '/dev/' + WIPEDEVICE]
 # WIPECMD = ['bash', '-c', 'sleep 20; exit $[RANDOM%4]']
 
 
